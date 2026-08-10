@@ -1,8 +1,7 @@
-import type { ChatInputCommandInteraction } from "discord.js";
-import type { SlashCommandBuilder } from "@discordjs/builders";
+import type { ChatInputCommandInteraction, SlashCommandBuilder, SlashCommandOptionsOnlyBuilder } from "discord.js";
 
 export interface Command {
-  data: SlashCommandBuilder;
+  data: SlashCommandBuilder | SlashCommandOptionsOnlyBuilder;
   cooldownSeconds?: number;
   execute(interaction: ChatInputCommandInteraction): Promise<void>;
 }
