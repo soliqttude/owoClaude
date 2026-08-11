@@ -9,7 +9,6 @@ export const dailyCommand: Command = {
   data: new SlashCommandBuilder().setName("daily").setDescription("Claim your daily cowoncy reward."),
   cooldownSeconds: 0,
   async execute(interaction: ChatInputCommandInteraction) {
-    // FIXED: Replaced 'ephemeral: false' with 'flags: 64' to remove the warning
     await interaction.deferReply({ flags: 64 });
 
     const user = await ensureUser(interaction.user.id);
@@ -70,9 +69,13 @@ export const dailyCommand: Command = {
     const cowoncyEmoji = `<cowoncy:1536522907012825178>`;
     const lootboxEmoji = `<box:1536524431290273822>`;
 
-    // SWAPPED: interaction.member.displayName
+    // FIX: Fetch display name safely. If in a DM, fallback to username.
+    const displayName = interaction.member && 'displayName' in interaction.member 
+      ? interaction.member.displayName 
+      : interaction.user.username;
+
     let replyLines = [
-      `💰 | ${interaction.member.displayName}, Here is your daily ${cowoncyEmoji}`,
+      `💰 | ${displayName}, Here is your daily ${cowoncyEmoji}`,
       `**${formattedCowoncy} Cowoncy!**`,
       `│ You're on a **${result.newStreak} daily streak**!`,
     ];
