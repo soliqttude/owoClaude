@@ -20,10 +20,10 @@ for (const command of commands) commandMap.set(command.data.name, command);
 const OWO_PREFIX = "owo";
 const ADMIN_PREFIX = "!";
 
-function parseCommand(content: string, prefix: string) {
+function parseCommand(content: string, prefix: string, requiresSeparator = false) {
   if (!content.startsWith(prefix)) return null;
   const remainder = content.slice(prefix.length);
-  if (remainder.length > 0 && !/\s/.test(remainder[0])) return null;
+  if (requiresSeparator && remainder.length > 0 && !/\s/.test(remainder[0])) return null;
   const tokens = remainder.trim().split(/\s+/);
   const commandName = tokens.shift()?.toLowerCase();
   if (!commandName) return null;
@@ -54,7 +54,7 @@ client.on("messageCreate", async (message) => {
     return;
   }
 
-  const parsed = parseCommand(message.content, OWO_PREFIX);
+  const parsed = parseCommand(message.content, OWO_PREFIX, true);
   if (!parsed) return;
   const command = commandMap.get(parsed.commandName);
   if (!command) return;
@@ -71,8 +71,9 @@ async function handleCommandError(message: Message, error: unknown) {
     await message.reply(error.message);
     return;
   }
-  console.error(error);
-  await message.reply("Something went wrong while processing that command. No balance was changed.");
+  const details = error instanceof Error ? error.message : String(error);
+  console.error("Command execution failed:", error);
+  await message.reply(`Something went wrong while processing that command. No balance was changed.\n\`${details}\``);
 }
 
 if (!process.env.DISCORD_TOKEN) {
