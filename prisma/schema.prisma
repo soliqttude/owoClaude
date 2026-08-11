@@ -21,6 +21,8 @@ model User {
   discordId    String    @unique
   cowoncy      BigInt    @default(0)
   dailyClaimAt DateTime?
+  dailyStreak  Int       @default(0)    // <-- NEW FIELD ADDED
+  lootboxes    Int       @default(0)    // <-- NEW FIELD ADDED
   huntPity     Int       @default(0)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
