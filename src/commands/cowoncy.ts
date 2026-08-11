@@ -1,4 +1,4 @@
-import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
+import { ChatInputCommandInteraction, SlashCommandBuilder, GuildMember } from "discord.js";
 import { Command } from "./command";
 import { ensureUser } from "../prisma";
 import { parseBigInt } from "./utils";
@@ -12,10 +12,15 @@ export const cowoncyCommand: Command = {
     
     const formattedBalance = balance.toLocaleString();
     
-    // FIX: Fetch display name safely. If in a DM, fallback to username.
-    const displayName = interaction.member && 'displayName' in interaction.member 
-      ? interaction.member.displayName 
-      : interaction.user.username;
+    // ----- FIXED DISPLAY NAME LOGIC -----
+    let displayName = interaction.user.username; // Default fallback
+    if (interaction.inGuild()) {
+      const member = interaction.member as GuildMember;
+      if (member) {
+        displayName = member.displayName;
+      }
+    }
+    // -------------------------------------
 
     const replyContent = `<:cowoncy:1536522907012825178> | ${displayName}, you currently have **__${formattedBalance} cowoncy__**!`;
 
