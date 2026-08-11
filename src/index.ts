@@ -1,6 +1,8 @@
 import { Client, GatewayIntentBits, Collection } from "discord.js";
-import { config } from "dotenv"; // if you use dotenv
-// Import your commands
+import { config } from "dotenv";
+import { Command } from "./commands/command"; // Import your new interface
+
+// Import your actual commands
 import { cowoncyCommand } from "./commands/cowoncy";
 import { dailyCommand } from "./commands/daily";
 import { inventoryCommand } from "./commands/inventory";
@@ -11,37 +13,33 @@ const client = new Client({
     intents: [
         GatewayIntentBits.Guilds, 
         GatewayIntentBits.GuildMessages, 
-        GatewayIntentBits.MessageContent // <--- CRITICAL: You MUST enable this intent!
+        GatewayIntentBits.MessageContent // REQUIRED for prefix bots
     ] 
 });
 
-// Store commands in a collection so we can find them easily
-const commands = new Collection();
+// Define a Collection that strictly holds your Command type
+const commands = new Collection<string, Command>();
 commands.set(cowoncyCommand.data.name, cowoncyCommand);
 commands.set(dailyCommand.data.name, dailyCommand);
 commands.set(inventoryCommand.data.name, inventoryCommand);
 
-// --- PREFIX LOGIC HERE ---
-const PREFIX = "owo"; // You can change this to "ow o" or "!" if you want
+const PREFIX = "owo";
 
 client.on('messageCreate', async (message) => {
-    // 1. Ignore bots and empty messages
+    // Ignore bots and empty messages
     if (message.author.bot) return;
     if (!message.content.startsWith(PREFIX)) return;
 
-    // 2. Split the message into command and args
-    // Example: "owo daily 5" -> ["owo", "daily", "5"]
+    // Split the message into command and args
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const commandName = args.shift()?.toLowerCase();
 
-    // 3. Check if the command exists
+    // Check if the command exists
     const command = commands.get(commandName);
     if (!command) return;
 
     try {
-        // 4. Run the command
-        // We wrap the interaction in a fake object to trick your existing command code
-        // But it's better to convert your commands to use message, so I'll give you the updated files below.
+        // Execute the command
         await command.execute(message, args);
     } catch (error) {
         console.error(error);
