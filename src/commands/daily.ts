@@ -9,7 +9,7 @@ export const dailyCommand: Command = {
   data: new SlashCommandBuilder().setName("daily").setDescription("Claim your daily cowoncy reward."),
   cooldownSeconds: 0,
   async execute(interaction: ChatInputCommandInteraction) {
-    await interaction.deferReply({ ephemeral: false }); 
+    await interaction.deferReply({ ephemeral: false });
 
     const user = await ensureUser(interaction.user.id);
 
@@ -23,41 +23,39 @@ export const dailyCommand: Command = {
         const diff = now.getTime() - lastClaimAt.getTime();
         const secondsUntilReady = 24 * 60 * 60 - Math.floor(diff / 1000);
         if (secondsUntilReady > 0) {
-          // Return type A: Cooldown
           return { claimed: false, secondsUntilReady, totalReward: 0n, newStreak: 0, gotLootbox: false };
         }
       }
 
-      // Streak and lootbox logic
+      // Streak & Lootbox Logic
       let newStreak = (lockedUser.dailyStreak || 0) + 1;
-      const streakBonus = BigInt(newStreak) * 50n; 
+      const streakBonus = BigInt(newStreak) * 50n;
       const totalReward = DAILY_REWARD + streakBonus;
 
-      const gotLootbox = Math.random() < 0.25; 
+      const gotLootbox = Math.random() < 0.25; // 25% chance
       const newLootboxCount = (lockedUser.lootboxes || 0) + (gotLootbox ? 1 : 0);
 
       const oldBalance = parseBigInt(lockedUser.cowoncy);
       const newBalance = oldBalance + totalReward;
 
+      // Update the user
       await tx.user.update({
         where: { id: user.id },
-        data: { 
-          cowoncy: newBalance, 
+        data: {
+          cowoncy: newBalance,
           dailyClaimAt: now,
-          dailyStreak: newStreak, // This was the error
-          lootboxes: newLootboxCount // This was the error
+          dailyStreak: newStreak,
+          lootboxes: newLootboxCount,
         },
       });
 
       await createLedgerEntry(tx, user.id, totalReward, "Daily reward claimed", "DAILY", oldBalance, newBalance);
-      // Return type B: Success
       return { claimed: true, newBalance, totalReward, newStreak, gotLootbox, secondsUntilReady: 0 };
     });
 
     // --- COOLDOWN REPLY ---
     if (!result.claimed) {
-      // FIX: TypeScript now knows 'secondsUntilReady' exists because we guaranteed it in the return above
-      const s = result.secondsUntilReady!; 
+      const s = result.secondsUntilReady!;
       const hours = Math.floor(s / 3600);
       const minutes = Math.floor((s % 3600) / 60);
       const seconds = s % 60;
@@ -70,12 +68,11 @@ export const dailyCommand: Command = {
     }
 
     // --- SUCCESS REPLY ---
-    // FIX: TypeScript now knows these exist because 'claimed' is true
     const formattedCowoncy = result.totalReward!.toLocaleString();
-    
-    // BOT EMOJIS (Hyphens, not colons)
-    const cowoncyEmoji = `<cowoncy:1536522907012825178>`; 
-    const lootboxEmoji = `<box:1536524431290273822>`; 
+
+    // APPLICATION EMOJIS (hyphens '-', not colons ':')
+    const cowoncyEmoji = `<cowoncy:1536522907012825178>`;
+    const lootboxEmoji = `<box:1536524431290273822>`; // Change 'box' if your emoji name is different
 
     let replyLines = [
       `💰 | ${interaction.user.username}, Here is your daily ${cowoncyEmoji}`,
