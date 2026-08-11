@@ -12,8 +12,12 @@ export const cowoncyCommand: Command = {
     
     const formattedBalance = balance.toLocaleString();
     
-    // SWAPPED: interaction.member.displayName
-    const replyContent = `<:cowoncy:1536522907012825178> | ${interaction.member.displayName}, you currently have **__${formattedBalance} cowoncy__**!`;
+    // FIX: Fetch display name safely. If in a DM, fallback to username.
+    const displayName = interaction.member && 'displayName' in interaction.member 
+      ? interaction.member.displayName 
+      : interaction.user.username;
+
+    const replyContent = `<:cowoncy:1536522907012825178> | ${displayName}, you currently have **__${formattedBalance} cowoncy__**!`;
 
     await interaction.reply({ content: replyContent });
   },
