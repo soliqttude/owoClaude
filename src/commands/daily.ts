@@ -9,7 +9,8 @@ export const dailyCommand: Command = {
   data: new SlashCommandBuilder().setName("daily").setDescription("Claim your daily cowoncy reward."),
   cooldownSeconds: 0,
   async execute(interaction: ChatInputCommandInteraction) {
-    await interaction.deferReply({ ephemeral: false });
+    // FIXED: Replaced 'ephemeral: false' with 'flags: 64' to remove the warning
+    await interaction.deferReply({ flags: 64 });
 
     const user = await ensureUser(interaction.user.id);
 
@@ -27,18 +28,16 @@ export const dailyCommand: Command = {
         }
       }
 
-      // Streak & Lootbox Logic
       let newStreak = (lockedUser.dailyStreak || 0) + 1;
       const streakBonus = BigInt(newStreak) * 50n;
       const totalReward = DAILY_REWARD + streakBonus;
 
-      const gotLootbox = Math.random() < 0.25; // 25% chance
+      const gotLootbox = Math.random() < 0.25;
       const newLootboxCount = (lockedUser.lootboxes || 0) + (gotLootbox ? 1 : 0);
 
       const oldBalance = parseBigInt(lockedUser.cowoncy);
       const newBalance = oldBalance + totalReward;
 
-      // Update the user
       await tx.user.update({
         where: { id: user.id },
         data: {
@@ -53,7 +52,6 @@ export const dailyCommand: Command = {
       return { claimed: true, newBalance, totalReward, newStreak, gotLootbox, secondsUntilReady: 0 };
     });
 
-    // --- COOLDOWN REPLY ---
     if (!result.claimed) {
       const s = result.secondsUntilReady!;
       const hours = Math.floor(s / 3600);
@@ -67,15 +65,14 @@ export const dailyCommand: Command = {
       return;
     }
 
-    // --- SUCCESS REPLY ---
     const formattedCowoncy = result.totalReward!.toLocaleString();
 
-    // APPLICATION EMOJIS (hyphens '-', not colons ':')
     const cowoncyEmoji = `<cowoncy:1536522907012825178>`;
-    const lootboxEmoji = `<box:1536524431290273822>`; // Change 'box' if your emoji name is different
+    const lootboxEmoji = `<box:1536524431290273822>`;
 
+    // SWAPPED: interaction.member.displayName
     let replyLines = [
-      `💰 | ${interaction.user.username}, Here is your daily ${cowoncyEmoji}`,
+      `💰 | ${interaction.member.displayName}, Here is your daily ${cowoncyEmoji}`,
       `**${formattedCowoncy} Cowoncy!**`,
       `│ You're on a **${result.newStreak} daily streak**!`,
     ];
