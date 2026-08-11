@@ -1,5 +1,7 @@
 const cooldowns = new Map<string, number>();
 
+export const GAMBLING_COOLDOWN_SECONDS = 10;
+
 export function checkCooldown(userId: string, commandName: string) {
   const key = `${commandName}:${userId}`;
   const expiresAt = cooldowns.get(key);
@@ -15,6 +17,7 @@ export function checkCooldown(userId: string, commandName: string) {
 }
 
 export function setCooldown(userId: string, commandName: string, seconds: number) {
+  if (seconds <= 0) return;
   const expiresAt = Date.now() + seconds * 1000;
   cooldowns.set(`${commandName}:${userId}`, expiresAt);
 }

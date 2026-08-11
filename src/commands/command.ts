@@ -1,6 +1,5 @@
 import { Message } from "discord.js";
 
-// This interface defines what a valid Prefix Command looks like
 export interface Command {
   data: {
     name: string;
@@ -8,4 +7,14 @@ export interface Command {
   };
   cooldownSeconds: number;
   execute: (message: Message, args: string[]) => Promise<void>;
+}
+
+export class CommandError extends Error {
+  public readonly code: string;
+
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = "CommandError";
+    this.code = code;
+  }
 }

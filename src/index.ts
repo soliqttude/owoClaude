@@ -1,53 +1,82 @@
-import { Client, GatewayIntentBits, Collection } from "discord.js";
+import { Client, GatewayIntentBits, Collection, Message } from "discord.js";
 import { config } from "dotenv";
-import { Command } from "./commands/command";
-
-import { cowoncyCommand } from "./commands/cowoncy";
-import { dailyCommand } from "./commands/daily";
-import { inventoryCommand } from "./commands/inventory";
-import { giveCommand } from "./commands/give";
-import { huntCommand } from "./commands/hunt";
-import { sellCommand } from "./commands/sell";
+import { CommandError } from "./commands/command";
+import { commands, addmoneyCommand } from "./commands";
+import { checkCooldown, setCooldown } from "./middleware";
 
 config();
 
-const client = new Client({ 
-    intents: [
-        GatewayIntentBits.Guilds, 
-        GatewayIntentBits.GuildMessages, 
-        GatewayIntentBits.MessageContent 
-    ] 
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
 });
 
-const commands = new Collection<string, Command>();
-commands.set(cowoncyCommand.data.name, cowoncyCommand);
-commands.set(dailyCommand.data.name, dailyCommand);
-commands.set(inventoryCommand.data.name, inventoryCommand);
-commands.set(giveCommand.data.name, giveCommand);
-commands.set(huntCommand.data.name, huntCommand);
-commands.set(sellCommand.data.name, sellCommand);
+const commandMap = new Collection<string, typeof commands[number]>();
+for (const command of commands) commandMap.set(command.data.name, command);
 
-const PREFIX = "owo";
+const OWO_PREFIX = "owo";
+const ADMIN_PREFIX = "!";
 
-client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
-    if (!message.content.startsWith(PREFIX)) return;
+function parseCommand(content: string, prefix: string) {
+  if (!content.startsWith(prefix)) return null;
+  const remainder = content.slice(prefix.length);
+  if (remainder.length > 0 && !/\s/.test(remainder[0])) return null;
+  const tokens = remainder.trim().split(/\s+/);
+  const commandName = tokens.shift()?.toLowerCase();
+  if (!commandName) return null;
+  return { commandName, args: tokens };
+}
 
-    const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-    const commandName = args.shift()?.toLowerCase();
+async function executeCommand(message: Message, command: typeof commands[number], args: string[]) {
+  const remaining = checkCooldown(message.author.id, command.data.name);
+  if (remaining > 0) {
+    await message.reply(`Please wait **${remaining}s** before using \`${command.data.name}\` again.`);
+    return;
+  }
 
-    // FIX: If commandName is undefined, stop here.
-    if (!commandName) return; 
+  await command.execute(message, args);
+  setCooldown(message.author.id, command.data.name, command.cooldownSeconds);
+}
 
-    const command = commands.get(commandName);
-    if (!command) return;
+client.on("messageCreate", async (message) => {
+  if (message.author.bot) return;
 
+  const adminParsed = parseCommand(message.content, ADMIN_PREFIX);
+  if (adminParsed?.commandName === addmoneyCommand.data.name) {
     try {
-        await command.execute(message, args);
+      await addmoneyCommand.execute(message, adminParsed.args);
     } catch (error) {
-        console.error(error);
-        await message.reply("There was an error executing that command!");
+      await handleCommandError(message, error);
     }
+    return;
+  }
+
+  const parsed = parseCommand(message.content, OWO_PREFIX);
+  if (!parsed) return;
+  const command = commandMap.get(parsed.commandName);
+  if (!command) return;
+
+  try {
+    await executeCommand(message, command, parsed.args);
+  } catch (error) {
+    await handleCommandError(message, error);
+  }
 });
 
-client.login(process.env.DISCORD_TOKEN);
+async function handleCommandError(message: Message, error: unknown) {
+  if (error instanceof CommandError) {
+    await message.reply(error.message);
+    return;
+  }
+  console.error(error);
+  await message.reply("Something went wrong while processing that command. No balance was changed.");
+}
+
+if (!process.env.DISCORD_TOKEN) {
+  throw new Error("DISCORD_TOKEN is required.");
+}
+
+void client.login(process.env.DISCORD_TOKEN);

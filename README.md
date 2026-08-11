@@ -26,7 +26,7 @@ Hunt creatures. Sell them for currency. Gamble it all away. Repeat.
   - `mines` — click tiles. Don't hit a mine. Good luck.
   - `snailgarden` — grow snails. Yes, snails.
 - **Give** — Gift currency to friends. Or enemies. We don't judge.
-- **Dual Commands** — Use `owo <cmd>` or `/cmd`. Whatever you like.
+- **Prefix Commands** — Use `owo <cmd>` for bot commands. Admin grants use `!addmoney`.
 
 ---
 

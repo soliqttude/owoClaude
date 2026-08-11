@@ -21,9 +21,19 @@ export async function ensureInventory(userId: string) {
 
 export async function lockUserById(tx: TransactionClient, userId: string) {
   const users = await tx.$queryRaw<Array<any>>`
-    SELECT id, "discordId", cowoncy, "dailyClaimAt", "huntPity"
+    SELECT id, "discordId", cowoncy, "dailyClaimAt", "dailyStreak", lootboxes, "huntPity"
     FROM "User"
     WHERE id = ${userId}
+    FOR UPDATE
+  `;
+  return users[0] ?? null;
+}
+
+export async function lockUserByDiscordId(tx: TransactionClient, discordId: string) {
+  const users = await tx.$queryRaw<Array<any>>`
+    SELECT id, "discordId", cowoncy, "dailyClaimAt", "dailyStreak", lootboxes, "huntPity"
+    FROM "User"
+    WHERE "discordId" = ${discordId}
     FOR UPDATE
   `;
   return users[0] ?? null;

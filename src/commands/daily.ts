@@ -1,98 +1,66 @@
-import { ChatInputCommandInteraction, SlashCommandBuilder, GuildMember } from "discord.js";
+import { Message } from "discord.js";
 import { Command } from "./command";
 import { prisma, ensureUser, createLedgerEntry, lockUserById } from "../prisma";
 import { parseBigInt } from "./utils";
 
 const DAILY_REWARD = 500n;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function utcDayKey(date: Date) {
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+}
 
 export const dailyCommand: Command = {
-  data: new SlashCommandBuilder().setName("daily").setDescription("Claim your daily cowoncy reward."),
+  data: { name: "daily", description: "Claim your daily cowoncy reward." },
   cooldownSeconds: 0,
-  async execute(interaction: ChatInputCommandInteraction) {
-    await interaction.deferReply({ flags: 64 });
-
-    const user = await ensureUser(interaction.user.id);
-
+  async execute(message: Message) {
+    const user = await ensureUser(message.author.id);
     const result = await prisma.$transaction(async (tx) => {
       const lockedUser = await lockUserById(tx, user.id);
       if (!lockedUser) throw new Error("Unable to lock user account.");
 
-      const lastClaimAt = lockedUser.dailyClaimAt ? new Date(lockedUser.dailyClaimAt) : null;
       const now = new Date();
-      if (lastClaimAt) {
-        const diff = now.getTime() - lastClaimAt.getTime();
-        const secondsUntilReady = 24 * 60 * 60 - Math.floor(diff / 1000);
-        if (secondsUntilReady > 0) {
-          return { claimed: false, secondsUntilReady, totalReward: 0n, newStreak: 0, gotLootbox: false };
-        }
+      const lastClaimAt = lockedUser.dailyClaimAt ? new Date(lockedUser.dailyClaimAt) : null;
+      if (lastClaimAt && utcDayKey(now) === utcDayKey(lastClaimAt)) {
+        const nextUtcMidnight = utcDayKey(now) + DAY_MS;
+        return { claimed: false, secondsUntilReady: Math.max(1, Math.ceil((nextUtcMidnight - now.getTime()) / 1000)) };
       }
 
-      let newStreak = (lockedUser.dailyStreak || 0) + 1;
-      const streakBonus = BigInt(newStreak) * 50n;
-      const totalReward = DAILY_REWARD + streakBonus;
-
+      const previousDay = utcDayKey(now) - DAY_MS;
+      const newStreak = lastClaimAt && utcDayKey(lastClaimAt) === previousDay
+        ? Number(lockedUser.dailyStreak ?? 0) + 1
+        : 1;
+      const reward = DAILY_REWARD + BigInt(newStreak) * 50n;
+      const balanceBefore = parseBigInt(lockedUser.cowoncy);
+      const balanceAfter = balanceBefore + reward;
       const gotLootbox = Math.random() < 0.25;
-      const newLootboxCount = (lockedUser.lootboxes || 0) + (gotLootbox ? 1 : 0);
-
-      const oldBalance = parseBigInt(lockedUser.cowoncy);
-      const newBalance = oldBalance + totalReward;
 
       await tx.user.update({
         where: { id: user.id },
         data: {
-          cowoncy: newBalance,
+          cowoncy: balanceAfter,
           dailyClaimAt: now,
           dailyStreak: newStreak,
-          lootboxes: newLootboxCount,
+          lootboxes: Number(lockedUser.lootboxes ?? 0) + (gotLootbox ? 1 : 0),
         },
       });
-
-      await createLedgerEntry(tx, user.id, totalReward, "Daily reward claimed", "DAILY", oldBalance, newBalance);
-      return { claimed: true, newBalance, totalReward, newStreak, gotLootbox, secondsUntilReady: 0 };
+      await createLedgerEntry(tx, user.id, reward, "Daily reward claimed", "DAILY", balanceBefore, balanceAfter);
+      return { claimed: true, reward, balanceAfter, newStreak, gotLootbox };
     });
 
     if (!result.claimed) {
-      const s = result.secondsUntilReady!;
-      const hours = Math.floor(s / 3600);
-      const minutes = Math.floor((s % 3600) / 60);
-      const seconds = s % 60;
-      const timeString = `${hours}H ${minutes}M ${seconds}S`;
-
-      await interaction.editReply({
-        content: `⏱️ | Your next daily is in: **${timeString}**`
-      });
+      const secondsUntilReady = result.secondsUntilReady ?? 0;
+      const hours = Math.floor(secondsUntilReady / 3600);
+      const minutes = Math.floor((secondsUntilReady % 3600) / 60);
+      const seconds = secondsUntilReady % 60;
+      await message.reply(`Your next daily is in **${hours}H ${minutes}M ${seconds}S**.`);
       return;
     }
 
-    const formattedCowoncy = result.totalReward!.toLocaleString();
-
-    const cowoncyEmoji = `<cowoncy:1536522907012825178>`;
-    const lootboxEmoji = `<box:1536524431290273822>`;
-
-    // ----- FIXED DISPLAY NAME LOGIC -----
-    let displayName = interaction.user.username; // Default fallback
-    if (interaction.inGuild()) {
-      const member = interaction.member as GuildMember;
-      if (member) {
-        displayName = member.displayName;
-      }
-    }
-    // -------------------------------------
-
-    let replyLines = [
-      `💰 | ${displayName}, Here is your daily ${cowoncyEmoji}`,
-      `**${formattedCowoncy} Cowoncy!**`,
-      `│ You're on a **${result.newStreak} daily streak**!`,
-    ];
-
-    if (result.gotLootbox) {
-      replyLines.push(`${lootboxEmoji} | You received a **lootbox**!`);
-    }
-
-    replyLines.push(`⏱️ | Your next daily is in: **24H 0M 0S**`);
-
-    await interaction.editReply({
-      content: replyLines.join('\n')
-    });
+    await message.reply(
+      `💰 ${message.member?.displayName ?? message.author.username}, you received **${result.reward?.toLocaleString() ?? "0"} cowoncy**!\n` +
+      `Daily streak: **${result.newStreak ?? 0}**\nBalance: **${result.balanceAfter?.toLocaleString() ?? "0"}**` +
+      (result.gotLootbox ? "\nYou also received a lootbox!" : ""),
+    );
   },
 };

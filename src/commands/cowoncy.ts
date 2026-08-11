@@ -6,14 +6,10 @@ import { parseBigInt } from "./utils";
 export const cowoncyCommand: Command = {
   data: { name: "cowoncy", description: "Show your cowoncy balance." },
   cooldownSeconds: 0,
-  async execute(message: Message, args: string[]) {
+  async execute(message: Message) {
     const user = await ensureUser(message.author.id);
-    const balance = parseBigInt(user.cowoncy);
-    
-    const formattedBalance = balance.toLocaleString();
-    let displayName = message.member?.displayName || message.author.username;
-
-    const replyContent = `<:cowoncy:1536522907012825178> | ${displayName}, you currently have **__${formattedBalance} cowoncy__**!`;
-    await message.reply({ content: replyContent });
+    await message.reply(
+      `<:cowoncy:1536522907012825178> | ${message.member?.displayName ?? message.author.username}, you currently have **${parseBigInt(user.cowoncy).toLocaleString()} cowoncy**!`,
+    );
   },
 };

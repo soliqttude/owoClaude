@@ -14,6 +14,8 @@ enum LedgerType {
   DAILY
   HUNT
   SELL
+  GAMBLING
+  ADMIN_GRANT
 }
 
 model User {
@@ -49,4 +51,28 @@ model Ledger {
   balanceBefore BigInt
   balanceAfter  BigInt
   createdAt     DateTime   @default(now())
+}
+
+model LotteryRound {
+  id              String          @id @default(cuid())
+  pool            BigInt          @default(0)
+  closesAt        DateTime
+  drawnAt         DateTime?
+  winnerDiscordId String?
+  createdAt       DateTime        @default(now())
+  tickets         LotteryTicket[]
+
+  @@index([drawnAt, closesAt])
+}
+
+model LotteryTicket {
+  id        String        @id @default(cuid())
+  round     LotteryRound  @relation(fields: [roundId], references: [id])
+  roundId   String
+  discordId String
+  tickets   Int           @default(0)
+  createdAt DateTime      @default(now())
+
+  @@unique([roundId, discordId])
+  @@index([roundId])
 }

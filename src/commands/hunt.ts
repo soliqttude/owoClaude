@@ -1,77 +1,52 @@
-import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
+import { Message } from "discord.js";
 import { Command } from "./command";
 import { prisma, TransactionClient, ensureUser, createLedgerEntry, lockUserById, lockInventoryByUserId } from "../prisma";
 import { getRandomHuntItem, getShinyVariant, getItemDisplayName } from "./items";
 import { parseBigInt, serializeInventory } from "./utils";
 
 function rollShiny(pity: number) {
-  const base = 0.01;
-  const bonus = 0.005 * pity;
-  const chance = Math.min(0.80, base + bonus);
-  return Math.random() < chance;
+  return Math.random() < Math.min(0.8, 0.01 + 0.005 * pity);
 }
 
 export const huntCommand: Command = {
-  data: new SlashCommandBuilder().setName("hunt").setDescription("Hunt for owo creatures and gear."),
+  data: { name: "hunt", description: "Hunt for owo creatures and gear." },
   cooldownSeconds: 10,
-  async execute(interaction: ChatInputCommandInteraction) {
-    await interaction.deferReply();
-
-    const user = await ensureUser(interaction.user.id);
-
+  async execute(message: Message) {
+    const user = await ensureUser(message.author.id);
     const result = await prisma.$transaction(async (tx: TransactionClient) => {
       const lockedUser = await lockUserById(tx, user.id);
       if (!lockedUser) throw new Error("Unable to lock user account.");
-      const currentCowoncy = parseBigInt(lockedUser.cowoncy);
-      const currentPity = Number(lockedUser.huntPity ?? 0);
 
-      const isShiny = rollShiny(currentPity);
+      // Upsert and lock the inventory in the same transaction as the balance update.
+      await tx.inventory.upsert({
+        where: { userId: user.id },
+        create: { userId: user.id, items: {} },
+        update: {},
+      });
+      const inventoryRow = await lockInventoryByUserId(tx, user.id);
+      if (!inventoryRow) throw new Error("Unable to lock user inventory.");
+
+      const isShiny = rollShiny(Number(lockedUser.huntPity ?? 0));
       const baseItem = getRandomHuntItem();
       const itemKey = isShiny ? getShinyVariant(baseItem) ?? baseItem : baseItem;
       const itemDisplay = getItemDisplayName(itemKey);
-
       const reward = BigInt(40 + Math.floor(Math.random() * 90));
-      const newBalance = currentCowoncy + reward;
-      const newPity = isShiny ? 0 : currentPity + 1;
-
-      const inventoryRow = await lockInventoryByUserId(tx, user.id);
-      const inventory = inventoryRow?.items as Record<string, number> | null;
-      const currentItems = inventory ?? {};
+      const balanceBefore = parseBigInt(lockedUser.cowoncy);
+      const balanceAfter = balanceBefore + reward;
+      const newPity = isShiny ? 0 : Number(lockedUser.huntPity ?? 0) + 1;
+      const currentItems = (inventoryRow.items as Record<string, number> | null) ?? {};
       const updatedItems = { ...currentItems, [itemKey]: (currentItems[itemKey] ?? 0) + 1 };
 
-      await tx.user.update({
-        where: { id: user.id },
-        data: { cowoncy: newBalance, huntPity: newPity },
-      });
+      await tx.user.update({ where: { id: user.id }, data: { cowoncy: balanceAfter, huntPity: newPity } });
+      await tx.inventory.update({ where: { id: inventoryRow.id }, data: { items: serializeInventory(updatedItems) } });
+      await createLedgerEntry(tx, user.id, reward, `Hunt reward for catching ${itemDisplay}`, "HUNT", balanceBefore, balanceAfter);
 
-      if (inventoryRow) {
-        await tx.inventory.update({
-          where: { id: inventoryRow.id },
-          data: { items: serializeInventory(updatedItems) },
-        });
-      } else {
-        await tx.inventory.create({ data: { userId: user.id, items: serializeInventory(updatedItems) } });
-      }
-
-      await createLedgerEntry(
-        tx,
-        user.id,
-        reward,
-        `Hunt reward for catching ${itemDisplay}`,
-        "HUNT",
-        currentCowoncy,
-        newBalance,
-      );
-
-      return { itemKey, itemDisplay, reward, isShiny, newBalance, newPity };
+      return { itemDisplay, reward, isShiny, newBalance: balanceAfter, newPity };
     });
 
-    const description = result.isShiny
-      ? `You found a **${result.itemDisplay}**! Shiny luck saved the day.`
-      : `You hunted a **${result.itemDisplay}**.`;
-
-    await interaction.editReply(
-      `${description}\n+${result.reward} cowoncy\nBalance: ${result.newBalance} cowoncy\nHunt pity: ${result.newPity}`,
+    await message.reply(
+      `${result.isShiny ? `You found a **${result.itemDisplay}**!` : `You hunted a **${result.itemDisplay}**.`}\n` +
+      `+${result.reward.toLocaleString()} cowoncy\nBalance: **${result.newBalance.toLocaleString()}**\nHunt pity: **${result.newPity}**`,
     );
   },
 };
