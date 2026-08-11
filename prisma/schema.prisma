@@ -16,6 +16,27 @@ enum LedgerType {
   SELL
   GAMBLING
   ADMIN_GRANT
+  GIFT_SENT
+  GIFT_RECEIVED
+  LOTTERY
+  SLOTS
+  COINFLIP
+  BLACKJACK
+  HIGHLOW
+  MINES
+  SNAILGARDEN
+  AUTOHUNT_COST
+  AUTOHUNT_REWARD
+  BATTLE_REWARD
+  QUEST_REWARD
+  CHECKLIST_REWARD
+  VOTE_REWARD
+  SHOP_PURCHASE
+  CRATE_PURCHASE
+  ADMIN_ADJUSTMENT
+  SACRIFICE
+  HUNT_COST
+  HUNT_SALE
 }
 
 model User {
@@ -23,8 +44,8 @@ model User {
   discordId    String    @unique
   cowoncy      BigInt    @default(0)
   dailyClaimAt DateTime?
-  dailyStreak  Int       @default(0)    // <-- NEW FIELD ADDED
-  lootboxes    Int       @default(0)    // <-- NEW FIELD ADDED
+  dailyStreak  Int       @default(0)
+  lootboxes    Int       @default(0)
   huntPity     Int       @default(0)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
