@@ -1,4 +1,4 @@
-import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
+import { ChatInputCommandInteraction, SlashCommandBuilder, GuildMember } from "discord.js";
 import { Command } from "./command";
 import { prisma, ensureUser, createLedgerEntry, lockUserById } from "../prisma";
 import { parseBigInt } from "./utils";
@@ -69,10 +69,15 @@ export const dailyCommand: Command = {
     const cowoncyEmoji = `<cowoncy:1536522907012825178>`;
     const lootboxEmoji = `<box:1536524431290273822>`;
 
-    // FIX: Fetch display name safely. If in a DM, fallback to username.
-    const displayName = interaction.member && 'displayName' in interaction.member 
-      ? interaction.member.displayName 
-      : interaction.user.username;
+    // ----- FIXED DISPLAY NAME LOGIC -----
+    let displayName = interaction.user.username; // Default fallback
+    if (interaction.inGuild()) {
+      const member = interaction.member as GuildMember;
+      if (member) {
+        displayName = member.displayName;
+      }
+    }
+    // -------------------------------------
 
     let replyLines = [
       `💰 | ${displayName}, Here is your daily ${cowoncyEmoji}`,
