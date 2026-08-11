@@ -1,7 +1,11 @@
-import type { ChatInputCommandInteraction, SlashCommandBuilder, SlashCommandOptionsOnlyBuilder } from "discord.js";
+import { Message } from "discord.js";
 
+// This interface defines what a valid Prefix Command looks like
 export interface Command {
-  data: SlashCommandBuilder | SlashCommandOptionsOnlyBuilder;
-  cooldownSeconds?: number;
-  execute(interaction: ChatInputCommandInteraction): Promise<void>;
+  data: {
+    name: string;
+    description?: string;
+  };
+  cooldownSeconds: number;
+  execute: (message: Message, args: string[]) => Promise<void>;
 }
