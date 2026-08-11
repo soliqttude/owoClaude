@@ -1,45 +1,48 @@
 import { Client, GatewayIntentBits, Collection } from "discord.js";
 import { config } from "dotenv";
-import { Command } from "./commands/command"; // Import your new interface
+import { Command } from "./commands/command";
 
-// Import your actual commands
 import { cowoncyCommand } from "./commands/cowoncy";
 import { dailyCommand } from "./commands/daily";
 import { inventoryCommand } from "./commands/inventory";
+import { giveCommand } from "./commands/give";
+import { huntCommand } from "./commands/hunt";
+import { sellCommand } from "./commands/sell";
 
-config(); // Load .env variables
+config();
 
 const client = new Client({ 
     intents: [
         GatewayIntentBits.Guilds, 
         GatewayIntentBits.GuildMessages, 
-        GatewayIntentBits.MessageContent // REQUIRED for prefix bots
+        GatewayIntentBits.MessageContent 
     ] 
 });
 
-// Define a Collection that strictly holds your Command type
 const commands = new Collection<string, Command>();
 commands.set(cowoncyCommand.data.name, cowoncyCommand);
 commands.set(dailyCommand.data.name, dailyCommand);
 commands.set(inventoryCommand.data.name, inventoryCommand);
+commands.set(giveCommand.data.name, giveCommand);
+commands.set(huntCommand.data.name, huntCommand);
+commands.set(sellCommand.data.name, sellCommand);
 
 const PREFIX = "owo";
 
 client.on('messageCreate', async (message) => {
-    // Ignore bots and empty messages
     if (message.author.bot) return;
     if (!message.content.startsWith(PREFIX)) return;
 
-    // Split the message into command and args
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const commandName = args.shift()?.toLowerCase();
 
-    // Check if the command exists
+    // FIX: If commandName is undefined, stop here.
+    if (!commandName) return; 
+
     const command = commands.get(commandName);
     if (!command) return;
 
     try {
-        // Execute the command
         await command.execute(message, args);
     } catch (error) {
         console.error(error);
