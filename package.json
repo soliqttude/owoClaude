@@ -16,14 +16,14 @@
     "prisma:migrate:deploy": "prisma migrate deploy"
   },
   "dependencies": {
-    "@prisma/client": "^5.17.0",
-    "discord.js": "^14.15.0",
-    "dotenv": "^16.3.1"
+    "@prisma/client": "^5.22.0",
+    "discord.js": "^14.27.0",
+    "dotenv": "^16.6.1"
   },
   "devDependencies": {
-    "@types/node": "^20.14.0",
-    "prisma": "^5.17.0",
-    "ts-node": "^10.9.1",
-    "typescript": "^5.5.4"
+    "@types/node": "^20.19.43",
+    "prisma": "^5.22.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
   }
 }

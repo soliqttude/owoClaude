@@ -1,17 +1,24 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, Message } from "discord.js";
 import { Command } from "../command";
 import { gamblingService, formatCurrency, parseBet, randomInt } from "../../services/GamblingService";
+import { GAME_COLORS, gameEmbed } from "./ui";
 
 interface Card {
   rank: string;
+  suit: string;
   value: number;
 }
 
 const RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"] as const;
+const SUITS = ["♠", "♥", "♦", "♣"] as const;
 
 function drawCard(): Card {
   const rank = RANKS[randomInt(RANKS.length)];
-  return { rank, value: rank === "A" ? 11 : ["J", "Q", "K"].includes(rank) ? 10 : Number(rank) };
+  return {
+    rank,
+    suit: SUITS[randomInt(SUITS.length)],
+    value: rank === "A" ? 11 : ["J", "Q", "K"].includes(rank) ? 10 : Number(rank),
+  };
 }
 
 function handValue(hand: Card[]) {
@@ -25,7 +32,30 @@ function handValue(hand: Card[]) {
 }
 
 function displayHand(hand: Card[]) {
-  return hand.map((card) => card.rank).join(" ");
+  return hand.map((card) => `\`${card.rank}${card.suit}\``).join(" ");
+}
+
+function blackjackEmbed(
+  player: Card[],
+  dealer: Card[],
+  showDealer: boolean,
+  color: number,
+  description?: string,
+) {
+  const embed = gameEmbed("🃏 BLACKJACK", color, description);
+  embed.addFields(
+    {
+      name: `Dealer [${showDealer ? handValue(dealer) : `${handValue([dealer[0]])}+?`}]`,
+      value: showDealer ? displayHand(dealer) : `${displayHand([dealer[0]])} \`🂠\``,
+      inline: false,
+    },
+    {
+      name: `Player [${handValue(player)}]`,
+      value: displayHand(player),
+      inline: false,
+    },
+  );
+  return embed;
 }
 
 export const blackjackCommand: Command = {
@@ -39,48 +69,69 @@ export const blackjackCommand: Command = {
 
     const finish = async (payout: bigint, text: string) => {
       const balance = await gamblingService.creditPayout(debited.userId, payout, "Blackjack");
-      await message.reply(`${text}\nBalance: **${formatCurrency(balance)}**`);
+      const embed = blackjackEmbed(player, dealer, true, payout > bet ? GAME_COLORS.green : GAME_COLORS.red, text);
+      embed.addFields(
+        { name: "Bet", value: `💵 ${formatCurrency(bet)}`, inline: true },
+        { name: "Payout", value: `💰 ${formatCurrency(payout)}`, inline: true },
+        { name: "Balance", value: `🪙 ${formatCurrency(balance)}`, inline: true },
+      );
+      await message.reply({ embeds: [embed.toJSON()] });
     };
 
     if (handValue(player) === 21) {
-      await finish((bet * 9n) / 4n, `🃏 Blackjack! You had **${displayHand(player)}** and the dealer had **${displayHand(dealer)}**.`);
+      await finish((bet * 9n) / 4n, `✨ **Blackjack!** ${message.author} hit 21 on the opening hand.`);
       return;
     }
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId(`blackjack:hit:${message.author.id}`).setLabel("Hit").setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`blackjack:stand:${message.author.id}`).setLabel("Stand").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId(`blackjack:hit:${message.author.id}`)
+        .setLabel("Hit")
+        .setEmoji("👊")
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(`blackjack:stand:${message.author.id}`)
+        .setLabel("Stand")
+        .setEmoji("🛑")
+        .setStyle(ButtonStyle.Secondary),
     );
     const gameMessage = await message.reply({
-      content: `🃏 **Blackjack**\nYour hand: **${displayHand(player)}** (${handValue(player)})\nDealer shows: **${dealer[0].rank} ?**`,
-      components: [row],
+      embeds: [blackjackEmbed(player, dealer, false, GAME_COLORS.blue, `${message.author} bet **${formatCurrency(bet)}** to play.\n🎲 Choose Hit or Stand.`).toJSON()],
+      components: [row.toJSON()],
     });
     const collector = gameMessage.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60000 });
     let settled = false;
+    let processing = false;
 
     collector.on("collect", async (interaction) => {
       if (interaction.user.id !== message.author.id) {
         await interaction.reply({ content: "This is not your blackjack game.", ephemeral: true });
         return;
       }
-      if (settled) return;
+      if (settled || processing) return;
+      processing = true;
       await interaction.deferUpdate();
 
       if (interaction.customId.includes(":hit:")) {
         player.push(drawCard());
         const value = handValue(player);
-        if (value >= 21) {
-          settled = true;
-          collector.stop();
-          if (value > 21) {
-            await interaction.editReply({ content: `🃏 You busted with **${displayHand(player)}** (${value}).`, components: [] });
-            return;
-          }
-        } else {
+        if (value < 21) {
+          processing = false;
           await interaction.editReply({
-            content: `🃏 **Blackjack**\nYour hand: **${displayHand(player)}** (${value})\nDealer shows: **${dealer[0].rank} ?**`,
-            components: [row],
+            embeds: [blackjackEmbed(player, dealer, false, GAME_COLORS.blue, `🎲 ${message.author} is still in the game.`).toJSON()],
+            components: [row.toJSON()],
           });
+          return;
+        }
+
+        settled = true;
+        collector.stop();
+        if (value > 21) {
+          processing = false;
+          const balance = await gamblingService.creditPayout(debited.userId, 0n, "Blackjack");
+          const embed = blackjackEmbed(player, dealer, true, GAME_COLORS.red, `💥 You busted with **${value}**. Your **${formatCurrency(bet)}** bet was lost.`);
+          embed.addFields({ name: "Balance", value: `🪙 ${formatCurrency(balance)}`, inline: true });
+          await interaction.editReply({ embeds: [embed.toJSON()], components: [] });
           return;
         }
       }
@@ -90,18 +141,35 @@ export const blackjackCommand: Command = {
       const dealerValue = handValue(dealer);
       settled = true;
       collector.stop();
-      const payout = playerValue > 21 ? 0n : dealerValue > 21 || playerValue > dealerValue ? bet * 2n : playerValue === dealerValue ? bet : 0n;
-      const text = playerValue > 21
-        ? `🃏 You busted with **${displayHand(player)}** (${playerValue}).`
-        : `🃏 You had **${displayHand(player)}** (${playerValue}); dealer had **${displayHand(dealer)}** (${dealerValue}).\n${payout > bet ? `You won **${formatCurrency(payout)}**!` : payout === bet ? "Push — your bet is returned." : "The dealer wins."}`;
+      const payout = dealerValue > 21 || playerValue > dealerValue ? bet * 2n : playerValue === dealerValue ? bet : 0n;
+      const text =
+        dealerValue > 21
+          ? `🎉 Dealer busted with **${dealerValue}**. You win!`
+          : playerValue > dealerValue
+            ? `🎉 You beat the dealer **${playerValue}** to **${dealerValue}**.`
+            : playerValue === dealerValue
+              ? "🤝 Push — your bet is returned."
+              : `💥 The dealer wins with **${dealerValue}**.`;
       const balance = await gamblingService.creditPayout(debited.userId, payout, "Blackjack");
-      await interaction.editReply({ content: `${text}\nBalance: **${formatCurrency(balance)}**`, components: [] });
+      processing = false;
+      const embed = blackjackEmbed(player, dealer, true, payout >= bet ? GAME_COLORS.green : GAME_COLORS.red, text);
+      embed.addFields(
+        { name: "Bet", value: `💵 ${formatCurrency(bet)}`, inline: true },
+        { name: "Payout", value: `💰 ${formatCurrency(payout)}`, inline: true },
+        { name: "Balance", value: `🪙 ${formatCurrency(balance)}`, inline: true },
+      );
+      await interaction.editReply({ embeds: [embed.toJSON()], components: [] });
     });
 
     collector.on("end", async () => {
       if (!settled) {
         settled = true;
-        await gameMessage.edit({ content: "🃏 Blackjack timed out. Your bet was forfeited.", components: [] }).catch(() => undefined);
+        await gameMessage
+          .edit({
+            embeds: [blackjackEmbed(player, dealer, false, GAME_COLORS.red, `⌛ Blackjack timed out. Your **${formatCurrency(bet)}** bet was forfeited.`).toJSON()],
+            components: [],
+          })
+          .catch(() => undefined);
       }
     });
   },

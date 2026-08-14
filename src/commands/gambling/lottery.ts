@@ -1,6 +1,7 @@
 import { Message } from "discord.js";
 import { Command } from "../command";
 import { gamblingService, formatCurrency, parsePositiveTicketCount } from "../../services/GamblingService";
+import { GAME_COLORS, gameEmbed } from "./ui";
 
 export const lotteryCommand: Command = {
   data: { name: "lottery", description: "Buy lottery tickets or check the current prize pool." },
@@ -12,9 +13,14 @@ export const lotteryCommand: Command = {
       const drawing = status.drawing
         ? `\nPrevious winner: <@${status.drawing.winnerDiscordId}> won **${formatCurrency(status.drawing.prize)}**.`
         : "";
-      await message.reply(
-        `🎟️ **Lottery**\nPool: **${formatCurrency(status.round.pool)}** cowoncy\nTickets sold: **${status.totalTickets}**\nDraws in approximately **${hours} hour${hours === 1 ? "" : "s"}**.${drawing}`,
+      const embed = gameEmbed("🎟️ LOTTERY", GAME_COLORS.gold, "Buy tickets and take a chance at the shared cowoncy pool.");
+      embed.addFields(
+        { name: "Prize pool", value: `💰 ${formatCurrency(status.round.pool)} cowoncy`, inline: true },
+        { name: "Tickets sold", value: `🎟️ ${status.totalTickets}`, inline: true },
+        { name: "Draws in", value: `⏳ ${hours} hour${hours === 1 ? "" : "s"}`, inline: true },
       );
+      if (drawing) embed.setFooter({ text: drawing.trim() });
+      await message.reply({ embeds: [embed.toJSON()] });
       return;
     }
 
@@ -24,10 +30,14 @@ export const lotteryCommand: Command = {
     const drawing = purchase.drawing
       ? `\nPrevious winner: <@${purchase.drawing.winnerDiscordId}> won **${formatCurrency(purchase.drawing.prize)}**.`
       : "";
-    await message.reply(
-      `🎟️ Bought **${purchase.ticketCount} ticket${purchase.ticketCount === 1 ? "" : "s"}** for **${formatCurrency(purchase.totalCost)}** cowoncy.\n` +
-      `Pool: **${formatCurrency(purchase.round.pool + purchase.totalCost)}** cowoncy\n` +
-      `Draws in approximately **${hours} hour${hours === 1 ? "" : "s"}**.\nBalance: **${formatCurrency(purchase.balanceAfter)}**${drawing}`,
+    const embed = gameEmbed("🎟️ LOTTERY — TICKETS BOUGHT", GAME_COLORS.gold, `You bought **${purchase.ticketCount} ticket${purchase.ticketCount === 1 ? "" : "s"}**.`);
+    embed.addFields(
+      { name: "Cost", value: `💵 ${formatCurrency(purchase.totalCost)} cowoncy`, inline: true },
+      { name: "Prize pool", value: `💰 ${formatCurrency(purchase.round.pool + purchase.totalCost)} cowoncy`, inline: true },
+      { name: "Draws in", value: `⏳ ${hours} hour${hours === 1 ? "" : "s"}`, inline: true },
+      { name: "Balance", value: `🪙 ${formatCurrency(purchase.balanceAfter)}`, inline: true },
     );
+    if (drawing) embed.setFooter({ text: drawing.trim() });
+    await message.reply({ embeds: [embed.toJSON()] });
   },
 };

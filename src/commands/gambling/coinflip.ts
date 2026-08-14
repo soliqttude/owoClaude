@@ -1,6 +1,7 @@
 import { Message } from "discord.js";
 import { Command, CommandError } from "../command";
 import { gamblingService, formatCurrency, parseBet, pick } from "../../services/GamblingService";
+import { GAME_COLORS, gameEmbed } from "./ui";
 
 const SIDES = ["heads", "tails"] as const;
 
@@ -16,8 +17,17 @@ export const coinflipCommand: Command = {
     const flip = pick(SIDES);
     const payout = flip === guess ? (bet * 19n) / 10n : 0n;
     const result = await gamblingService.settleBet(message.author.id, bet, "Coinflip", () => ({ payout, result: flip }));
-    await message.reply(
-      `🪙 The coin landed on **${flip}**.\n${payout > 0n ? `You won **${formatCurrency(payout)}**!` : "The house wins this time."}\nBalance: **${formatCurrency(result.balance)}**`,
+    const won = payout > 0n;
+    const embed = gameEmbed(
+      won ? "🪙 COINFLIP — WIN" : "🪙 COINFLIP",
+      won ? GAME_COLORS.green : GAME_COLORS.red,
+      `The coin landed on **${flip}**.\n${won ? `✨ You won **${formatCurrency(payout)}**!` : "The house wins this time."}`,
     );
+    embed.addFields(
+      { name: "Your guess", value: guess === "heads" ? "🟡 Heads" : "⚪ Tails", inline: true },
+      { name: "Bet", value: `💵 ${formatCurrency(bet)}`, inline: true },
+      { name: "Balance", value: `🪙 ${formatCurrency(result.balance)}`, inline: true },
+    );
+    await message.reply({ embeds: [embed.toJSON()] });
   },
 };
