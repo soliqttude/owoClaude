@@ -1,16 +1,31 @@
-# `owo-bot`
+# owo-bot
 
-> **Yes, it's a clone. No, you don't have to pay for premium. Free money. Free gambling. Free everything. 💰**
+An OwO-style Discord economy bot built with TypeScript, Discord.js, Prisma, and PostgreSQL.
 
----
+## Overview
 
-## What Is This?
+Hunt creatures, earn cowoncy, trade with friends, and play a collection of gambling games. The bot is designed to be self-hosted with a straightforward TypeScript and Prisma setup.
 
-It's an **OwO Bot clone** — same games, same grind, same gambling addiction — but **completely free**. No pay-to-win. No premium currency. No "wait 24 hours or pay $5." Just raw, unfiltered, degenerate gambling.
+## Stack
 
-Hunt creatures. Sell them for currency. Gamble it all away. Repeat.
+- Node.js 24+
+- TypeScript
+- Discord.js
+- Prisma ORM
+- PostgreSQL
 
----
+## Repository layout
+
+```text
+.
+├── prisma/              # Database schema and migrations
+├── src/                 # Discord commands, services, and middleware
+├── .env.example         # Required environment variables
+├── .nvmrc               # Pinned Node.js major version
+├── package.json         # Scripts and dependencies
+├── README.md            # Setup and command reference
+└── tsconfig.json        # TypeScript configuration
+```
 
 ## Setup
 
@@ -38,60 +53,43 @@ npm run prisma:migrate:deploy
 
 This does not drop or recreate any tables. Do not run `prisma migrate reset` against the production database.
 
----
-
 ## Features
 
-- **Hunt** — Spend currency, catch creatures, roll for shinies, pity system so you don't go 0/1000
-- **Sell** — Turn creatures into cold hard cash
-- **Daily** — Free money every day. Streak bonus if you're consistent.
-- **Gambling** — 7 ways to lose it all:
-  - `slots` — pull the lever
-  - `coinflip` — 50/50. No skill. Pure luck.
-  - `blackjack` — "I can count cards" (you can't)
-  - `lottery` — someone wins. Probably not you.
-  - `highlow` — guess higher or lower. Wrong? Lose.
-  - `mines` — click tiles. Don't hit a mine. Good luck.
-  - `snailgarden` — grow snails. Yes, snails.
-- **Give** — Gift currency to friends. Or enemies. We don't judge.
-- **Prefix Commands** — Use `owo <cmd>` for bot commands. Admin grants use `!addmoney <amount> <@user>`.
-
----
+- **Hunt** — Spend currency, catch creatures, roll for shinies, and use the pity system.
+- **Sell** — Turn creatures into cowoncy.
+- **Daily** — Claim daily rewards with streak bonuses.
+- **Gambling** — Slots, coinflip, blackjack, lottery, highlow, mines, and snailgarden.
+- **Give** — Transfer cowoncy to friends.
+- **Prefix commands** — Use `owo <command>`. Admin grants use `!addmoney <amount> <@user>`.
 
 ## Commands
 
-| Command | What It Does |
-|---------|--------------|
+| Command | What it does |
+| --- | --- |
 | `owo cowoncy` | Check your balance |
-| `owo daily` | Free money. Claim it. |
-| `owo give @user 100` | Share the wealth |
-| `owo hunt` | Catch creatures (costs money) |
-| `owo sell <creature>` | Cash out |
-| `owo inventory` | See what you own |
-| `owo slots` | 🎰 |
-| `owo coinflip` | 50/50. No skill. |
-| `owo blackjack` | Try to beat the house (you won't) |
-| `owo lottery` | Someone gets rich |
-| `owo highlow` | Guess right or lose |
-| `owo mines` | Don't click the boom |
-| `owo snailgarden` | 🐌 |
+| `owo daily` | Claim a daily reward |
+| `owo give @user 100` | Transfer cowoncy |
+| `owo hunt` | Catch creatures |
+| `owo sell <creature>` | Sell creatures |
+| `owo inventory` | View your inventory |
+| `owo slots` | Play slots |
+| `owo coinflip` | Play coinflip |
+| `owo blackjack` | Play blackjack |
+| `owo lottery` | Buy lottery tickets |
+| `owo highlow` | Guess higher or lower |
+| `owo mines` | Play mines |
+| `owo snailgarden` | Grow snails |
 
----
+## Configuration
 
-# Feature Real OwO This Clone
-Free to play ✅ ✅
-Premium currency ❌ (costs $) ✅ (free)
-Pay to win ❌ ✅ (no)
-Gambling ✅ ✅ (more)
-Dev takes your money ✅ ❌
-Actually fun ✅ ✅ (debatable)
+Copy `.env.example` to `.env` and set:
 
-# License
+```env
+DISCORD_TOKEN=your-discord-bot-token
+DISCORD_CLIENT_ID=your-discord-application-client-id
+DATABASE_URL=postgresql://user:password@localhost:5432/owo_claude
+```
 
-MIT — free as in freedom and free as in free money.
+## License
 
----
-
-Credits
-
-Built because OwO Bot is great but paying for premium is cringe.
+MIT. See [LICENSE](LICENSE).
