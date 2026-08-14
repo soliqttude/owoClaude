@@ -1,0 +1,1 @@
+- [Repository layout direction](repo-layout.md) — keep Prisma conventions while maintaining a clean, focused GitHub repository.
