@@ -26,6 +26,18 @@ npm start
 
 The migration step is required after pulling schema changes. In particular, it adds the ledger enum values used by the gambling commands.
 
+### Existing production database
+
+If `npm run prisma:migrate:deploy` reports `P3005` because the database already contains tables, apply this additive migration directly once, then record it as applied:
+
+```bash
+npx prisma db execute --schema=prisma/schema.prisma --file=prisma/migrations/20260814180000_sync_ledger_type/migration.sql
+npx prisma migrate resolve --applied 20260814180000_sync_ledger_type
+npm run prisma:migrate:deploy
+```
+
+This does not drop or recreate any tables. Do not run `prisma migrate reset` against the production database.
+
 ---
 
 ## Features
