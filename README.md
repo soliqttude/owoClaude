@@ -12,6 +12,22 @@ Hunt creatures. Sell them for currency. Gamble it all away. Repeat.
 
 ---
 
+## Setup
+
+Install dependencies, apply the Prisma migrations to the database, and then start the bot:
+
+```bash
+npm ci
+npm run prisma:generate
+npm run prisma:migrate:deploy
+npm run build
+npm start
+```
+
+The migration step is required after pulling schema changes. In particular, it adds the ledger enum values used by the gambling commands.
+
+---
+
 ## Features
 
 - **Hunt** — Spend currency, catch creatures, roll for shinies, pity system so you don't go 0/1000
