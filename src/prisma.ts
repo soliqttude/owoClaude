@@ -3,6 +3,43 @@ import { PrismaClient, Prisma, LedgerType } from "@prisma/client";
 export const prisma = new PrismaClient();
 export type TransactionClient = Prisma.TransactionClient;
 
+const LEDGER_TYPE_VALUES = [
+  "GAMBLING",
+  "GIFT_SENT",
+  "GIFT_RECEIVED",
+  "LOTTERY",
+  "SLOTS",
+  "COINFLIP",
+  "BLACKJACK",
+  "HIGHLOW",
+  "MINES",
+  "SNAILGARDEN",
+  "AUTOHUNT_COST",
+  "AUTOHUNT_REWARD",
+  "BATTLE_REWARD",
+  "QUEST_REWARD",
+  "CHECKLIST_REWARD",
+  "VOTE_REWARD",
+  "SHOP_PURCHASE",
+  "CRATE_PURCHASE",
+  "ADMIN_ADJUSTMENT",
+  "SACRIFICE",
+  "HUNT_COST",
+  "HUNT_SALE",
+] as const;
+
+/**
+ * Repairs the additive LedgerType change for databases created before the
+ * migration history was introduced. Every statement is idempotent, so this
+ * can safely run whenever the bot starts.
+ */
+export async function ensureLedgerTypeValues() {
+  await prisma.$connect();
+  for (const value of LEDGER_TYPE_VALUES) {
+    await prisma.$executeRawUnsafe(`ALTER TYPE "LedgerType" ADD VALUE IF NOT EXISTS '${value}'`);
+  }
+}
+
 export async function ensureUser(discordId: string) {
   return prisma.user.upsert({
     where: { discordId },

@@ -29,29 +29,20 @@ Hunt creatures, earn cowoncy, trade with friends, and play a collection of gambl
 
 ## Setup
 
-Install dependencies, apply the Prisma migrations to the database, and then start the bot:
+Install dependencies, generate the Prisma client, build the bot, and start it:
 
 ```bash
 npm ci
 npm run prisma:generate
-npm run prisma:migrate:deploy
 npm run build
 npm start
 ```
 
-The migration step is required after pulling schema changes. In particular, it adds the ledger enum values used by the gambling commands.
+On startup, the bot automatically applies the missing additive `LedgerType` enum values. Existing production databases do not need a manual console command for the gambling commands to work.
 
-### Existing production database
+### Future Prisma migrations
 
-If `npm run prisma:migrate:deploy` reports `P3005` because the database already contains tables, apply this additive migration directly once, then record it as applied:
-
-```bash
-npx prisma db execute --schema=prisma/schema.prisma --file=prisma/migrations/20260814180000_sync_ledger_type/migration.sql
-npx prisma migrate resolve --applied 20260814180000_sync_ledger_type
-npm run prisma:migrate:deploy
-```
-
-This does not drop or recreate any tables. Do not run `prisma migrate reset` against the production database.
+For future schema changes that add or change tables, use Prisma migrations during deployment. If Prisma reports `P3005` because a production database predates migration history, baseline that database before deploying the new migration. Never run `prisma migrate reset` against production.
 
 ## Features
 

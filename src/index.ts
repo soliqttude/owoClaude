@@ -3,6 +3,7 @@ import { config } from "dotenv";
 import { CommandError } from "./commands/command";
 import { commands, addmoneyCommand } from "./commands";
 import { checkCooldown, setCooldown } from "./middleware";
+import { ensureLedgerTypeValues } from "./prisma";
 
 config();
 
@@ -80,4 +81,14 @@ if (!process.env.DISCORD_TOKEN) {
   throw new Error("DISCORD_TOKEN is required.");
 }
 
-void client.login(process.env.DISCORD_TOKEN);
+async function start() {
+  try {
+    await ensureLedgerTypeValues();
+    await client.login(process.env.DISCORD_TOKEN);
+  } catch (error) {
+    console.error("Unable to initialize the bot:", error);
+    process.exitCode = 1;
+  }
+}
+
+void start();
