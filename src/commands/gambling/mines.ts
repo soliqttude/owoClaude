@@ -5,7 +5,7 @@ import { GAME_COLORS, formatMultiplier, gameEmbed } from "./ui";
 
 const GRID_SIZE = 9;
 const MINE_COUNT = 3;
-const MULTIPLIERS = [100n, 140n, 220n, 320n, 460n, 650n, 900n] as const;
+const MULTIPLIERS = [0n, 140n, 220n, 320n, 460n, 650n, 900n] as const;
 
 function payoutForSafeTiles(bet: bigint, safeTiles: number) {
   const multiplier = MULTIPLIERS[Math.min(safeTiles, MULTIPLIERS.length - 1)];
@@ -22,7 +22,7 @@ function buildGrid(ownerId: string, revealed: Set<number>, mines: Set<number>, f
         .setStyle(mine ? ButtonStyle.Danger : ButtonStyle.Success)
         .setDisabled(true);
     } else {
-      button.setLabel("◆").setStyle(ButtonStyle.Secondary);
+      button.setLabel("?").setStyle(ButtonStyle.Secondary);
     }
     return button;
   });
@@ -47,8 +47,12 @@ function minesEmbed(
   embed.addFields(
     { name: "Bet", value: `💵 ${formatCurrency(bet)}`, inline: true },
     { name: "Mines", value: `💣 ${MINE_COUNT}`, inline: true },
-    { name: "Winnings", value: `💰 ${formatCurrency(payout)} (${formatMultiplier(payout, bet)})`, inline: true },
-    { name: "Next", value: `💎 ${formatCurrency(payoutForSafeTiles(bet, safeTiles + 1))}`, inline: true },
+    { name: "Cash Out", value: `💰 ${formatCurrency(payout)} (${formatMultiplier(payout, bet)})`, inline: true },
+    {
+      name: "Next",
+      value: `💎 ${formatCurrency(payoutForSafeTiles(bet, safeTiles + 1))} (${formatMultiplier(payoutForSafeTiles(bet, safeTiles + 1), bet)})`,
+      inline: true,
+    },
   );
   return embed;
 }
@@ -72,13 +76,14 @@ export const minesCommand: Command = {
       .setStyle(ButtonStyle.Success);
     const initialGrid = buildGrid(message.author.id, revealed, mines, false, cashout);
     const gameMessage = await message.reply({
+      content: message.author.toString(),
       embeds: [
         minesEmbed(
           bet,
           0,
           GAME_COLORS.blue,
-          `💎 ${message.author} started a Mines game`,
-          "Pick a tile to reveal a diamond. Cash out before you uncover a bomb.",
+          "💎 Mines",
+          `**${message.author}** started a game of Mines!\nPick a tile to reveal a diamond. Cash out before you uncover a bomb.`,
         ).toJSON(),
       ],
       components: initialGrid,
@@ -91,7 +96,7 @@ export const minesCommand: Command = {
       const balance = await gamblingService.creditPayout(debited.userId, payout, "Mines");
       const embed = minesEmbed(bet, revealed.size, color, title, description);
       embed.addFields({ name: "Balance", value: `🪙 ${formatCurrency(balance)}`, inline: true });
-      await gameMessage.edit({ embeds: [embed.toJSON()], components: buildGrid(message.author.id, revealed, mines, true, cashout) });
+      await gameMessage.edit({ content: message.author.toString(), embeds: [embed.toJSON()], components: buildGrid(message.author.id, revealed, mines, true, cashout) });
     };
 
     collector.on("collect", async (interaction) => {
@@ -137,7 +142,7 @@ export const minesCommand: Command = {
         bet,
         revealed.size,
         GAME_COLORS.blue,
-        `💎 ${message.author}'s Mines game`,
+          "💎 Mines",
         "Keep picking safe tiles or cash out while the winnings are yours.",
       );
       await gameMessage.edit({ embeds: [embed.toJSON()], components: buildGrid(message.author.id, revealed, mines, false, cashout) });

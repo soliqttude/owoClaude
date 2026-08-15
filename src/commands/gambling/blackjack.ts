@@ -1,7 +1,7 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, Message } from "discord.js";
+import { Message } from "discord.js";
 import { Command } from "../command";
 import { gamblingService, formatCurrency, parseBet, randomInt } from "../../services/GamblingService";
-import { GAME_COLORS, gameEmbed } from "./ui";
+import { GAME_COLORS, cardGlyph, gameEmbed } from "./ui";
 
 interface Card {
   rank: string;
@@ -11,6 +11,8 @@ interface Card {
 
 const RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"] as const;
 const SUITS = ["♠", "♥", "♦", "♣"] as const;
+const HIT_REACTION = "👊";
+const STAND_REACTION = "🛑";
 
 function drawCard(): Card {
   const rank = RANKS[randomInt(RANKS.length)];
@@ -32,7 +34,7 @@ function handValue(hand: Card[]) {
 }
 
 function displayHand(hand: Card[]) {
-  return hand.map((card) => `\`${card.rank}${card.suit}\``).join(" ");
+  return hand.map((card) => cardGlyph(card.rank, card.suit)).join(" ");
 }
 
 function blackjackEmbed(
@@ -40,13 +42,13 @@ function blackjackEmbed(
   dealer: Card[],
   showDealer: boolean,
   color: number,
-  description?: string,
+  description: string,
 ) {
-  const embed = gameEmbed("🃏 BLACKJACK", color, description);
+  const embed = gameEmbed("", color, description);
   embed.addFields(
     {
       name: `Dealer [${showDealer ? handValue(dealer) : `${handValue([dealer[0]])}+?`}]`,
-      value: showDealer ? displayHand(dealer) : `${displayHand([dealer[0]])} \`🂠\``,
+      value: showDealer ? displayHand(dealer) : `${displayHand([dealer[0]])} 🂠`,
       inline: false,
     },
     {
@@ -83,55 +85,73 @@ export const blackjackCommand: Command = {
       return;
     }
 
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`blackjack:hit:${message.author.id}`)
-        .setLabel("Hit")
-        .setEmoji("👊")
-        .setStyle(ButtonStyle.Primary),
-      new ButtonBuilder()
-        .setCustomId(`blackjack:stand:${message.author.id}`)
-        .setLabel("Stand")
-        .setEmoji("🛑")
-        .setStyle(ButtonStyle.Secondary),
-    );
     const gameMessage = await message.reply({
-      embeds: [blackjackEmbed(player, dealer, false, GAME_COLORS.blue, `${message.author} bet **${formatCurrency(bet)}** to play.\n🎲 Choose Hit or Stand.`).toJSON()],
-      components: [row.toJSON()],
+      embeds: [
+        blackjackEmbed(
+          player,
+          dealer,
+          false,
+          GAME_COLORS.blue,
+          `${message.author}, you bet **${formatCurrency(bet)}** to play blackjack.\n🎲 React with 👊 to hit or 🛑 to stand.`,
+        ).toJSON(),
+      ],
     });
-    const collector = gameMessage.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60000 });
+    await gameMessage.react(HIT_REACTION);
+    await gameMessage.react(STAND_REACTION);
+
+    const collector = gameMessage.createReactionCollector({ time: 60000 });
     let settled = false;
     let processing = false;
 
-    collector.on("collect", async (interaction) => {
-      if (interaction.user.id !== message.author.id) {
-        await interaction.reply({ content: "This is not your blackjack game.", ephemeral: true });
+    collector.on("collect", async (reaction, user) => {
+      if (user.bot) return;
+      if (user.id !== message.author.id) {
+        await reaction.users.remove(user.id).catch(() => undefined);
         return;
       }
       if (settled || processing) return;
-      processing = true;
-      await interaction.deferUpdate();
+      if (reaction.emoji.name !== HIT_REACTION && reaction.emoji.name !== STAND_REACTION) {
+        await reaction.users.remove(user.id).catch(() => undefined);
+        return;
+      }
 
-      if (interaction.customId.includes(":hit:")) {
+      processing = true;
+      const isHit = reaction.emoji.name === HIT_REACTION;
+      await reaction.users.remove(user.id).catch(() => undefined);
+
+      if (isHit) {
         player.push(drawCard());
         const value = handValue(player);
         if (value < 21) {
-          processing = false;
-          await interaction.editReply({
-            embeds: [blackjackEmbed(player, dealer, false, GAME_COLORS.blue, `🎲 ${message.author} is still in the game.`).toJSON()],
-            components: [row.toJSON()],
+          await gameMessage.edit({
+            embeds: [
+              blackjackEmbed(
+                player,
+                dealer,
+                false,
+                GAME_COLORS.blue,
+                `${message.author}, you bet **${formatCurrency(bet)}** to play blackjack.\n🎲 React with 👊 to hit or 🛑 to stand.`,
+              ).toJSON(),
+            ],
           });
+          processing = false;
           return;
         }
 
         settled = true;
         collector.stop();
         if (value > 21) {
-          processing = false;
           const balance = await gamblingService.creditPayout(debited.userId, 0n, "Blackjack");
-          const embed = blackjackEmbed(player, dealer, true, GAME_COLORS.red, `💥 You busted with **${value}**. Your **${formatCurrency(bet)}** bet was lost.`);
+          const embed = blackjackEmbed(
+            player,
+            dealer,
+            true,
+            GAME_COLORS.red,
+            `💥 ${message.author} busted with **${value}**. Your **${formatCurrency(bet)}** bet was lost.`,
+          );
           embed.addFields({ name: "Balance", value: `🪙 ${formatCurrency(balance)}`, inline: true });
-          await interaction.editReply({ embeds: [embed.toJSON()], components: [] });
+          await gameMessage.edit({ embeds: [embed.toJSON()] });
+          processing = false;
           return;
         }
       }
@@ -158,7 +178,7 @@ export const blackjackCommand: Command = {
         { name: "Payout", value: `💰 ${formatCurrency(payout)}`, inline: true },
         { name: "Balance", value: `🪙 ${formatCurrency(balance)}`, inline: true },
       );
-      await interaction.editReply({ embeds: [embed.toJSON()], components: [] });
+      await gameMessage.edit({ embeds: [embed.toJSON()] });
     });
 
     collector.on("end", async () => {
@@ -166,8 +186,15 @@ export const blackjackCommand: Command = {
         settled = true;
         await gameMessage
           .edit({
-            embeds: [blackjackEmbed(player, dealer, false, GAME_COLORS.red, `⌛ Blackjack timed out. Your **${formatCurrency(bet)}** bet was forfeited.`).toJSON()],
-            components: [],
+            embeds: [
+              blackjackEmbed(
+                player,
+                dealer,
+                false,
+                GAME_COLORS.red,
+                `⌛ Blackjack timed out. Your **${formatCurrency(bet)}** bet was forfeited.`,
+              ).toJSON(),
+            ],
           })
           .catch(() => undefined);
       }

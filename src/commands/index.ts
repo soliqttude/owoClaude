@@ -13,6 +13,7 @@ import { highlowCommand } from "./gambling/highlow";
 import { minesCommand } from "./gambling/mines";
 import { snailgardenCommand } from "./gambling/snailgarden";
 import { addmoneyCommand } from "./addmoney";
+import { helpCommand } from "./help";
 
 export const commands: Command[] = [
   huntCommand,
@@ -28,6 +29,7 @@ export const commands: Command[] = [
   highlowCommand,
   minesCommand,
   snailgardenCommand,
+  helpCommand,
 ];
 
 export const commandMap = new Map(commands.map((command) => [command.data.name, command]));
