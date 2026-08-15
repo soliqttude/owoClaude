@@ -1,10 +1,9 @@
 import { Message } from "discord.js";
-import { LedgerType } from "@prisma/client";
 import { Command, CommandError } from "./command";
 import { prisma, ensureUser, createLedgerEntry, lockUserById } from "../prisma";
 import { parseBigInt, parsePositiveInteger } from "./utils";
 
-const ADMIN_ID = "1515503343005597741";
+export const ADMIN_ID = "1515503343005597741";
 
 export const addmoneyCommand: Command = {
   data: { name: "addmoney", description: "Grant cowoncy to a user." },
@@ -26,7 +25,9 @@ export const addmoneyCommand: Command = {
       const balanceBefore = parseBigInt(lockedUser.cowoncy);
       const balanceAfter = balanceBefore + amount;
       await tx.user.update({ where: { id: user.id }, data: { cowoncy: balanceAfter } });
-      await createLedgerEntry(tx, user.id, amount, "admin_grant", LedgerType.ADMIN_GRANT, balanceBefore, balanceAfter);
+      // ADMIN_ADJUSTMENT is present in the production enum migration. Do not
+      // use ADMIN_GRANT here: older deployments have no such enum value.
+      await createLedgerEntry(tx, user.id, amount, "Admin grant", "ADMIN_ADJUSTMENT", balanceBefore, balanceAfter);
       return balanceAfter;
     });
     await message.reply(`Added **${amount.toLocaleString()} cowoncy** to ${target}. New balance: **${newBalance.toLocaleString()}**.`);
